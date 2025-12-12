@@ -1,0 +1,792 @@
+# requests.py
+"""
+Модуль для управления запросами, заявками и взаимодействием между пользователями
+"""
+import json
+import os
+import re
+from datetime import datetime, timedelta
+from typing import Dict, List, Optional, Tuple, Any
+from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton
+from telegram.ext import ContextTypes
+
+# Импортируем системы из других модулей
+try:
+    from need_help import request_system as need_help_system
+    from offer_help import help_system as offer_help_system
+except ImportError:
+    # Заглушки для тестирования
+    class StubSystem:
+        def __init__(self):
+            pass
+        
+        def get_request_by_id(self, *args):
+            return None
+        
+        def get_user_requests(self, *args):
+            return []
+        
+        def get_applications_for_request(self, *args):
+            return []
+        
+        def get_user_applications(self, *args):
+            return []
+    
+    need_help_system = StubSystem()
+    offer_help_system = StubSystem()
+
+class RequestManager:
+    """Менеджер для управления всеми типами запросов"""
+    
+    def __init__(self):
+        self.messages_file = "data/request_messages.json"
+        self.reviews_file = "data/request_reviews.json"
+        self.notifications_file = "data/request_notifications.json"
+        self._init_data_files()
+    
+    def _init_data_files(self):
+        """Инициализирует файлы данных"""
+        os.makedirs("data", exist_ok=True)
+        
+        for file_path in [self.messages_file, self.reviews_file, self.notifications_file]:
+            if not os.path.exists(file_path):
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    json.dump([], f, ensure_ascii=False)
+    
+    def save_message(self, request_id: int, sender_id: int, sender_name: str, 
+                    receiver_id: int, message: str, message_type: str = "text") -> int:
+        """Сохраняет сообщение по запросу"""
+        with open(self.messages_file, 'r', encoding='utf-8') as f:
+            messages = json.load(f)
+        
+        msg = {
+            'id': len(messages) + 1,
+            'request_id': request_id,
+            'sender_id': sender_id,
+            'sender_name': sender_name,
+            'receiver_id': receiver_id,
+            'message': message,
+            'message_type': message_type,
+            'timestamp': datetime.now().isoformat(),
+            'is_read': False
+        }
+        
+        messages.append(msg)
+        
+        with open(self.messages_file, 'w', encoding='utf-8') as f:
+            json.dump(messages, f, ensure_ascii=False, indent=2)
+        
+        # Создаем уведомление
+        self.create_notification(
+            user_id=receiver_id,
+            title="Новое сообщение",
+            message=f"Новое сообщение по запросу #{request_id}",
+            notification_type="message",
+            data={'request_id': request_id, 'message_id': msg['id']}
+        )
+        
+        return msg['id']
+    
+    def create_notification(self, user_id: int, title: str, message: str, 
+                           notification_type: str, data: Dict = None):
+        """Создает уведомление для пользователя"""
+        with open(self.notifications_file, 'r', encoding='utf-8') as f:
+            notifications = json.load(f)
+        
+        notification = {
+            'id': len(notifications) + 1,
+            'user_id': user_id,
+            'title': title,
+            'message': message,
+            'type': notification_type,
+            'data': data or {},
+            'timestamp': datetime.now().isoformat(),
+            'is_read': False
+        }
+        
+        notifications.append(notification)
+        
+        with open(self.notifications_file, 'w', encoding='utf-8') as f:
+            json.dump(notifications, f, ensure_ascii=False, indent=2)
+    
+    def get_unread_notifications(self, user_id: int) -> List[Dict]:
+        """Получает непрочитанные уведомления пользователя"""
+        with open(self.notifications_file, 'r', encoding='utf-8') as f:
+            notifications = json.load(f)
+        
+        unread = [
+            n for n in notifications 
+            if n['user_id'] == user_id and not n['is_read']
+        ]
+        
+        # Сортируем по дате (сначала новые)
+        unread.sort(key=lambda x: x['timestamp'], reverse=True)
+        
+        return unread
+    
+    def mark_notification_read(self, notification_id: int):
+        """Отмечает уведомление как прочитанное"""
+        with open(self.notifications_file, 'r', encoding='utf-8') as f:
+            notifications = json.load(f)
+        
+        for notification in notifications:
+            if notification['id'] == notification_id:
+                notification['is_read'] = True
+                break
+        
+        with open(self.notifications_file, 'w', encoding='utf-8') as f:
+            json.dump(notifications, f, ensure_ascii=False, indent=2)
+    
+    def save_review(self, request_id: int, reviewer_id: int, reviewed_id: int,
+                   rating: int, comment: str, review_type: str = "request") -> int:
+        """Сохраняет отзыв по запросу"""
+        if rating < 1 or rating > 5:
+            raise ValueError("Рейтинг должен быть от 1 до 5")
+        
+        with open(self.reviews_file, 'r', encoding='utf-8') as f:
+            reviews = json.load(f)
+        
+        review = {
+            'id': len(reviews) + 1,
+            'request_id': request_id,
+            'reviewer_id': reviewer_id,
+            'reviewed_id': reviewed_id,
+            'rating': rating,
+            'comment': comment,
+            'type': review_type,
+            'timestamp': datetime.now().isoformat(),
+            'is_verified': False
+        }
+        
+        reviews.append(review)
+        
+        with open(self.reviews_file, 'w', encoding='utf-8') as f:
+            json.dump(reviews, f, ensure_ascii=False, indent=2)
+        
+        return review['id']
+    
+    def get_user_reviews(self, user_id: int) -> Dict[str, Any]:
+        """Получает отзывы пользователя"""
+        with open(self.reviews_file, 'r', encoding='utf-8') as f:
+            reviews = json.load(f)
+        
+        user_reviews = [r for r in reviews if r['reviewed_id'] == user_id]
+        
+        if not user_reviews:
+            return {
+                'count': 0,
+                'average_rating': 0,
+                'reviews': []
+            }
+        
+        avg_rating = sum(r['rating'] for r in user_reviews) / len(user_reviews)
+        
+        return {
+            'count': len(user_reviews),
+            'average_rating': round(avg_rating, 1),
+            'reviews': user_reviews[-10:]  # Последние 10 отзывов
+        }
+    
+    def get_request_messages(self, request_id: int) -> List[Dict]:
+        """Получает сообщения по запросу"""
+        with open(self.messages_file, 'r', encoding='utf-8') as f:
+            messages = json.load(f)
+        
+        request_messages = [
+            msg for msg in messages 
+            if msg['request_id'] == request_id
+        ]
+        
+        # Сортируем по времени
+        request_messages.sort(key=lambda x: x['timestamp'])
+        
+        return request_messages
+
+# Создаем глобальный экземпляр менеджера
+request_manager = RequestManager()
+
+# Константы состояний для ConversationHandler
+SEND_MESSAGE, SEND_REVIEW, SELECT_RATING = range(20, 23)
+
+# Клавиатуры
+def get_requests_main_keyboard():
+    """Основная клавиатура раздела запросов"""
+    keyboard = [
+        [KeyboardButton("📨 Мои сообщения"), KeyboardButton("🔔 Уведомления")],
+        [KeyboardButton("⭐ Мои отзывы"), KeyboardButton("📊 Статистика")],
+        [KeyboardButton("💬 Чат по запросу"), KeyboardButton("📋 Активные")],
+        [KeyboardButton("🔍 Поиск по ID"), KeyboardButton("⚙️ Настройки")],
+        [KeyboardButton("🔙 Назад в меню")]
+    ]
+    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=False)
+
+def get_messages_keyboard():
+    """Клавиатура для сообщений"""
+    keyboard = [
+        [KeyboardButton("✉️ Новое сообщение"), KeyboardButton("📥 Входящие")],
+        [KeyboardButton("📤 Исходящие"), KeyboardButton("💬 Диалоги")],
+        [KeyboardButton("🔙 Назад")]
+    ]
+    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
+
+def get_review_rating_keyboard():
+    """Клавиатура для выбора рейтинга"""
+    keyboard = [
+        [
+            InlineKeyboardButton("⭐", callback_data="rate_1"),
+            InlineKeyboardButton("⭐⭐", callback_data="rate_2"),
+            InlineKeyboardButton("⭐⭐⭐", callback_data="rate_3"),
+            InlineKeyboardButton("⭐⭐⭐⭐", callback_data="rate_4"),
+            InlineKeyboardButton("⭐⭐⭐⭐⭐", callback_data="rate_5")
+        ]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+def get_request_chat_keyboard(request_id: int):
+    """Клавиатура для чата по запросу"""
+    keyboard = [
+        [
+            InlineKeyboardButton("📝 Отправить сообщение", callback_data=f"chat_send_{request_id}"),
+            InlineKeyboardButton("📎 Прикрепить файл", callback_data=f"chat_attach_{request_id}")
+        ],
+        [
+            InlineKeyboardButton("⭐ Оставить отзыв", callback_data=f"chat_review_{request_id}"),
+            InlineKeyboardButton("✅ Завершить чат", callback_data=f"chat_end_{request_id}")
+        ],
+        [
+            InlineKeyboardButton("🔙 К запросу", callback_data=f"chat_back_{request_id}")
+        ]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+# Обработчики команд
+async def show_requests_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Показывает меню управления запросами"""
+    user_id = update.effective_user.id
+    
+    # Проверяем непрочитанные уведомления
+    notifications = request_manager.get_unread_notifications(user_id)
+    notification_count = len(notifications)
+    
+    greeting = f"📋 *Управление запросами*\n\n"
+    
+    if notification_count > 0:
+        greeting += f"🔔 У вас {notification_count} непрочитанных уведомлений\n\n"
+    
+    greeting += (
+        "Здесь вы можете:\n"
+        "• Управлять сообщениями\n"
+        "• Просматривать уведомления\n"
+        "• Оставлять отзывы\n"
+        "• Общаться по запросам\n\n"
+        "Выберите действие:"
+    )
+    
+    await update.message.reply_text(
+        greeting,
+        reply_markup=get_requests_main_keyboard(),
+        parse_mode='Markdown'
+    )
+
+async def show_notifications(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Показывает уведомления пользователя"""
+    user_id = update.effective_user.id
+    notifications = request_manager.get_unread_notifications(user_id)
+    
+    if not notifications:
+        await update.message.reply_text(
+            "📭 *Уведомления*\n\n"
+            "У вас нет непрочитанных уведомлений.",
+            parse_mode='Markdown',
+            reply_markup=get_requests_main_keyboard()
+        )
+        return
+    
+    await update.message.reply_text(
+        f"🔔 *Уведомления ({len(notifications)})*\n\n"
+        "👇 Ваши непрочитанные уведомления:",
+        parse_mode='Markdown'
+    )
+    
+    # Показываем последние 5 уведомлений
+    for i, notification in enumerate(notifications[:5], 1):
+        time_ago = get_time_ago(notification['timestamp'])
+        
+        notification_text = (
+            f"📌 *{notification['title']}*\n"
+            f"{notification['message']}\n"
+            f"🕐 {time_ago}\n"
+        )
+        
+        keyboard = [[
+            InlineKeyboardButton(
+                "✅ Прочитать", 
+                callback_data=f"read_notif_{notification['id']}"
+            ),
+            InlineKeyboardButton(
+                "📋 К запросу" if 'request_id' in notification.get('data', {}) else "📊 Подробнее",
+                callback_data=f"view_notif_{notification['id']}"
+            )
+        ]]
+        
+        await update.message.reply_text(
+            notification_text,
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode='Markdown'
+        )
+    
+    if len(notifications) > 5:
+        await update.message.reply_text(
+            f"И еще {len(notifications) - 5} уведомлений...",
+            reply_markup=get_requests_main_keyboard()
+        )
+
+def get_time_ago(timestamp_str: str) -> str:
+    """Возвращает строку 'сколько времени назад'"""
+    timestamp = datetime.fromisoformat(timestamp_str)
+    now = datetime.now()
+    diff = now - timestamp
+    
+    if diff.days > 0:
+        return f"{diff.days} дн. назад"
+    elif diff.seconds // 3600 > 0:
+        return f"{diff.seconds // 3600} ч. назад"
+    elif diff.seconds // 60 > 0:
+        return f"{diff.seconds // 60} мин. назад"
+    else:
+        return "только что"
+
+async def show_messages_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Показывает меню сообщений"""
+    await update.message.reply_text(
+        "📨 *Сообщения*\n\n"
+        "Выберите раздел:",
+        reply_markup=get_messages_keyboard(),
+        parse_mode='Markdown'
+    )
+
+async def start_new_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Начинает отправку нового сообщения"""
+    await update.message.reply_text(
+        "✉️ *Новое сообщение*\n\n"
+        "Введите ID запроса или пользователя, которому хотите написать:\n\n"
+        "Формат:\n"
+        "• Для запроса: `#123` или `123`\n"
+        "• Для пользователя: `@username` или `user123`\n\n"
+        "Или нажмите '🔙 Назад' для отмены.",
+        parse_mode='Markdown',
+        reply_markup=ReplyKeyboardMarkup([["🔙 Назад"]], resize_keyboard=True)
+    )
+    return SEND_MESSAGE
+
+async def process_message_target(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обрабатывает цель сообщения"""
+    if update.message.text == "🔙 Назад":
+        await update.message.reply_text(
+            "Действие отменено.",
+            reply_markup=get_requests_main_keyboard()
+        )
+        from telegram.ext import ConversationHandler
+        return ConversationHandler.END
+    
+    target = update.message.text.strip()
+    
+    # Парсим цель
+    if target.startswith('#') or target.isdigit():
+        # Это ID запроса
+        request_id = int(target.replace('#', ''))
+        context.user_data['message_target'] = {'type': 'request', 'id': request_id}
+        
+        # Проверяем существование запроса
+        request = need_help_system.get_request_by_id(request_id)
+        if not request:
+            await update.message.reply_text(
+                f"❌ Запрос #{request_id} не найден.\n"
+                f"Проверьте правильность ID и попробуйте снова:",
+                reply_markup=ReplyKeyboardMarkup([["🔙 Назад"]], resize_keyboard=True)
+            )
+            return SEND_MESSAGE
+        
+        await update.message.reply_text(
+            f"📋 *Запрос #{request_id}*\n"
+            f"📝 {request.get('category', 'Неизвестная категория')}\n"
+            f"👤 Автор: {request.get('username', 'Неизвестен')}\n\n"
+            f"Теперь введите ваше сообщение:",
+            parse_mode='Markdown',
+            reply_markup=ReplyKeyboardMarkup([["🔙 Назад"]], resize_keyboard=True)
+        )
+    
+    elif target.startswith('@') or re.match(r'^[a-zA-Z0-9_]+$', target):
+        # Это username пользователя
+        username = target.replace('@', '')
+        context.user_data['message_target'] = {'type': 'user', 'username': username}
+        
+        await update.message.reply_text(
+            f"👤 *Пользователь:* {target}\n\n"
+            f"Теперь введите ваше сообщение:",
+            parse_mode='Markdown',
+            reply_markup=ReplyKeyboardMarkup([["🔙 Назад"]], resize_keyboard=True)
+        )
+    
+    else:
+        await update.message.reply_text(
+            "❌ Неверный формат.\n"
+            "Используйте:\n"
+            "• Для запроса: `#123`\n"
+            "• Для пользователя: `@username`\n\n"
+            "Попробуйте снова:",
+            parse_mode='Markdown',
+            reply_markup=ReplyKeyboardMarkup([["🔙 Назад"]], resize_keyboard=True)
+        )
+        return SEND_MESSAGE
+    
+    return SEND_MESSAGE + 1  # Переходим к следующему состоянию
+
+async def send_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Отправляет сообщение"""
+    message_text = update.message.text
+    
+    if message_text == "🔙 Назад":
+        await update.message.reply_text(
+            "Введите ID запроса или пользователя:",
+            reply_markup=ReplyKeyboardMarkup([["🔙 Назад"]], resize_keyboard=True)
+        )
+        return SEND_MESSAGE
+    
+    target = context.user_data.get('message_target', {})
+    user = update.effective_user
+    
+    if target.get('type') == 'request':
+        request_id = target['id']
+        
+        # Здесь должна быть логика определения получателя
+        # Для примера: получатель - автор запроса
+        request = need_help_system.get_request_by_id(request_id)
+        if request:
+            receiver_id = request['user_id']
+            receiver_name = request['username']
+            
+            # Сохраняем сообщение
+            message_id = request_manager.save_message(
+                request_id=request_id,
+                sender_id=user.id,
+                sender_name=user.username or user.first_name,
+                receiver_id=receiver_id,
+                message=message_text
+            )
+            
+            await update.message.reply_text(
+                f"✅ *Сообщение отправлено!*\n\n"
+                f"📋 К запросу: #{request_id}\n"
+                f"👤 Кому: {receiver_name}\n"
+                f"🆔 ID сообщения: #{message_id}\n\n"
+                f"Сообщение:\n{message_text[:100]}...",
+                parse_mode='Markdown',
+                reply_markup=get_requests_main_keyboard()
+            )
+        else:
+            await update.message.reply_text(
+                "❌ Запрос не найден.",
+                reply_markup=get_requests_main_keyboard()
+            )
+    
+    else:
+        # Отправка пользователю (заглушка)
+        await update.message.reply_text(
+            f"✉️ *Сообщение отправлено пользователю*\n\n"
+            f"Ваше сообщение:\n{message_text}",
+            parse_mode='Markdown',
+            reply_markup=get_requests_main_keyboard()
+        )
+    
+    # Очищаем временные данные
+    context.user_data.clear()
+    
+    from telegram.ext import ConversationHandler
+    return ConversationHandler.END
+
+async def start_review(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Начинает процесс оставления отзыва"""
+    query = update.callback_query
+    await query.answer()
+    
+    request_id = int(query.data.replace("chat_review_", ""))
+    context.user_data['review_request_id'] = request_id
+    
+    await query.edit_message_text(
+        f"⭐ *Оставить отзыв по запросу #{request_id}*\n\n"
+        f"Выберите оценку:",
+        reply_markup=get_review_rating_keyboard()
+    )
+    return SELECT_RATING
+
+async def process_rating(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обрабатывает выбор рейтинга"""
+    query = update.callback_query
+    await query.answer()
+    
+    rating = int(query.data.replace("rate_", ""))
+    context.user_data['review_rating'] = rating
+    
+    await query.edit_message_text(
+        f"⭐ Оценка: {'⭐' * rating}\n\n"
+        f"Теперь напишите комментарий к отзыву:\n\n"
+        f"*Совет:* Опишите ваше впечатление от сотрудничества, "
+        f"что понравилось, что можно улучшить.",
+        parse_mode='Markdown'
+    )
+    return SEND_REVIEW
+
+async def save_review(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Сохраняет отзыв"""
+    comment = update.message.text
+    request_id = context.user_data.get('review_request_id')
+    rating = context.user_data.get('review_rating')
+    user = update.effective_user
+    
+    if not request_id or not rating:
+        await update.message.reply_text(
+            "❌ Ошибка при сохранении отзыва.",
+            reply_markup=get_requests_main_keyboard()
+        )
+        return
+    
+    # Получаем информацию о запросе
+    request = need_help_system.get_request_by_id(request_id)
+    if not request:
+        await update.message.reply_text(
+            f"❌ Запрос #{request_id} не найден.",
+            reply_markup=get_requests_main_keyboard()
+        )
+        return
+    
+    # Определяем, кто оставляет отзыв (исполнитель или заказчик)
+    # Для примера: предполагаем, что это исполнитель оставляет отзыв заказчику
+    reviewed_id = request['user_id']  # Автор запроса
+    
+    # Сохраняем отзыв
+    review_id = request_manager.save_review(
+        request_id=request_id,
+        reviewer_id=user.id,
+        reviewed_id=reviewed_id,
+        rating=rating,
+        comment=comment
+    )
+    
+    # Очищаем временные данные
+    context.user_data.clear()
+    
+    await update.message.reply_text(
+        f"✅ *Отзыв сохранен!*\n\n"
+        f"🆔 ID отзыва: #{review_id}\n"
+        f"⭐ Оценка: {'⭐' * rating}\n"
+        f"📝 Комментарий: {comment[:50]}...\n\n"
+        f"Спасибо за ваш отзыв! Он помогает улучшать сервис.",
+        parse_mode='Markdown',
+        reply_markup=get_requests_main_keyboard()
+    )
+    
+    from telegram.ext import ConversationHandler
+    return ConversationHandler.END
+
+async def show_my_reviews(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Показывает отзывы пользователя"""
+    user_id = update.effective_user.id
+    reviews_data = request_manager.get_user_reviews(user_id)
+    
+    if reviews_data['count'] == 0:
+        await update.message.reply_text(
+            "⭐ *Мои отзывы*\n\n"
+            "У вас пока нет отзывов.\n"
+            "Отзывы появятся после завершения сотрудничества по запросам.",
+            parse_mode='Markdown',
+            reply_markup=get_requests_main_keyboard()
+        )
+        return
+    
+    await update.message.reply_text(
+        f"⭐ *Мои отзывы*\n\n"
+        f"📊 *Статистика:*\n"
+        f"• Всего отзывов: {reviews_data['count']}\n"
+        f"• Средний рейтинг: {reviews_data['average_rating']}/5\n\n"
+        f"👇 Последние отзывы:",
+        parse_mode='Markdown'
+    )
+    
+    # Показываем последние 3 отзыва
+    for review in reviews_data['reviews'][-3:]:
+        review_text = (
+            f"📋 *Запрос #{review['request_id']}*\n"
+            f"⭐ Оценка: {'⭐' * review['rating']}\n"
+            f"📝 Комментарий:\n{review['comment'][:150]}...\n"
+            f"📅 {datetime.fromisoformat(review['timestamp']).strftime('%d.%m.%Y')}"
+        )
+        
+        await update.message.reply_text(
+            review_text,
+            parse_mode='Markdown'
+        )
+    
+    await update.message.reply_text(
+        "Для просмотра всех отзывов используйте веб-версию.",
+        reply_markup=get_requests_main_keyboard()
+    )
+
+async def show_active_requests(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Показывает активные запросы пользователя"""
+    user_id = update.effective_user.id
+    
+    # Получаем запросы из need_help системы
+    requests = need_help_system.get_user_requests(user_id)
+    
+    if not requests:
+        await update.message.reply_text(
+            "📭 *Активные запросы*\n\n"
+            "У вас пока нет активных запросов.\n"
+            "Создайте запрос в разделе '🆘 Нужна помощь'.",
+            parse_mode='Markdown',
+            reply_markup=get_requests_main_keyboard()
+        )
+        return
+    
+    # Фильтруем активные запросы
+    active_requests = [
+        req for req in requests 
+        if req.get('is_active', False) and req.get('status') in ['open', 'in_progress']
+    ]
+    
+    if not active_requests:
+        await update.message.reply_text(
+            "📭 *Активные запросы*\n\n"
+            "Нет активных запросов.\n"
+            "Все ваши запросы завершены или отменены.",
+            parse_mode='Markdown',
+            reply_markup=get_requests_main_keyboard()
+        )
+        return
+    
+    await update.message.reply_text(
+        f"📋 *Активные запросы ({len(active_requests)})*\n\n"
+        f"👇 Ваши активные запросы:",
+        parse_mode='Markdown'
+    )
+    
+    for request in active_requests[:5]:  # Показываем первые 5
+        time_ago = get_time_ago(request['created_at'])
+        
+        request_text = (
+            f"🆔 *Запрос #{request['id']}*\n"
+            f"📝 {request.get('category', 'Без категории')}\n"
+            f"💰 {request.get('budget', 'Без бюджета')}\n"
+            f"📊 Откликов: {request.get('applications_count', 0)}\n"
+            f"📅 {time_ago}\n"
+            f"📋 Статус: {request.get('status', 'unknown')}"
+        )
+        
+        keyboard = [[
+            InlineKeyboardButton(
+                "💬 Чат", 
+                callback_data=f"view_chat_{request['id']}"
+            ),
+            InlineKeyboardButton(
+                "📊 Детали", 
+                callback_data=f"view_details_{request['id']}"
+            ),
+            InlineKeyboardButton(
+                "👥 Отклики", 
+                callback_data=f"view_apps_{request['id']}"
+            )
+        ]]
+        
+        await update.message.reply_text(
+            request_text,
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode='Markdown'
+        )
+    
+    if len(active_requests) > 5:
+        await update.message.reply_text(
+            f"И еще {len(active_requests) - 5} активных запросов...",
+            reply_markup=get_requests_main_keyboard()
+        )
+
+async def cancel_requests_flow(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Отменяет текущий процесс"""
+    await update.message.reply_text(
+        "Действие отменено.",
+        reply_markup=get_requests_main_keyboard()
+    )
+    
+    # Очищаем временные данные
+    context.user_data.clear()
+    
+    from telegram.ext import ConversationHandler
+    return ConversationHandler.END
+
+# Обработчик callback-запросов
+async def handle_requests_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обрабатывает нажатия inline-кнопок"""
+    query = update.callback_query
+    await query.answer()
+    
+    callback_data = query.data
+    
+    if callback_data.startswith("read_notif_"):
+        notification_id = int(callback_data.replace("read_notif_", ""))
+        request_manager.mark_notification_read(notification_id)
+        
+        await query.edit_message_text(
+            "✅ Уведомление отмечено как прочитанное.",
+            parse_mode='Markdown'
+        )
+    
+    elif callback_data.startswith("view_chat_"):
+        request_id = int(callback_data.replace("view_chat_", ""))
+        
+        # Получаем сообщения по запросу
+        messages = request_manager.get_request_messages(request_id)
+        
+        if not messages:
+            await query.edit_message_text(
+                f"💬 *Чат по запросу #{request_id}*\n\n"
+                "Пока нет сообщений в этом чате.\n"
+                "Начните общение, отправив первое сообщение!",
+                reply_markup=get_request_chat_keyboard(request_id),
+                parse_mode='Markdown'
+            )
+        else:
+            chat_text = f"💬 *Чат по запросу #{request_id}*\n\n"
+            
+            for msg in messages[-10:]:  # Последние 10 сообщений
+                time_str = datetime.fromisoformat(msg['timestamp']).strftime('%H:%M')
+                sender = msg['sender_name']
+                chat_text += f"**{sender}** ({time_str}):\n{msg['message']}\n\n"
+            
+            await query.edit_message_text(
+                chat_text,
+                reply_markup=get_request_chat_keyboard(request_id),
+                parse_mode='Markdown'
+            )
+    
+    elif callback_data.startswith("chat_back_"):
+        request_id = int(callback_data.replace("chat_back_", ""))
+        
+        # Возвращаемся к деталям запроса
+        request = need_help_system.get_request_by_id(request_id)
+        if request:
+            from need_help import format_request_text
+            request_text = format_request_text(
+                request_id=request['id'],
+                username=request['username'],
+                category=request['category'],
+                description=request['description'],
+                budget=request['budget'],
+                deadline=request['deadline']
+            )
+            
+            from need_help import get_request_keyboard
+            await query.edit_message_text(
+                request_text,
+                reply_markup=get_request_keyboard(request_id, is_owner=True),
+                parse_mode='Markdown'
+            )
