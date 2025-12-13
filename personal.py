@@ -4,11 +4,43 @@
 """
 import json
 import os
+import logging
 from datetime import datetime
 from typing import Dict, Any, Optional
+
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes
+
+from keyboards import get_profile_keyboard, get_main_menu_keyboard
 from states import EDIT_NAME, EDIT_AGE, EDIT_EMAIL, EDIT_PHONE  # импортируем состояния
+
+logger = logging.getLogger(__name__)
+
+def _read_user_from_file(telegram_id: str) -> Optional[dict]:
+    users_path = os.path.join("data", "users.json")
+    if not os.path.exists(users_path):
+        return None
+    try:
+        with open(users_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        return data.get(str(telegram_id))
+    except Exception:
+        return None
+
+def _save_user_to_file(telegram_id: str, user_data: dict):
+    users_path = os.path.join("data", "users.json")
+    os.makedirs(os.path.dirname(users_path), exist_ok=True)
+    try:
+        existing = {}
+        if os.path.exists(users_path):
+            with open(users_path, 'r', encoding='utf-8') as f:
+                txt = f.read().strip()
+                existing = json.loads(txt) if txt else {}
+        existing[str(telegram_id)] = user_data
+        with open(users_path, 'w', encoding='utf-8') as f:
+            json.dump(existing, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        logger.error(f"Ошибка записи профиля в файл: {e}", exc_info=True)
 
 class UserProfile:
     """Класс для управления профилем пользователя"""
@@ -104,175 +136,111 @@ class UserProfile:
         required_fields = ['name', 'age', 'email']
         return all(self.profile.get(field) for field in required_fields)
 
-def get_profile_keyboard():
-    """Клавиатура для профиля"""
-    keyboard = [
-        [
-            InlineKeyboardButton("✏️ Изменить имя", callback_data="edit_name"),
-            InlineKeyboardButton("✏️ Возраст", callback_data="edit_age")
-        ],
-        [
-            InlineKeyboardButton("✏️ Email", callback_data="edit_email"),
-            InlineKeyboardButton("✏️ Телефон", callback_data="edit_phone")
-        ],
-        [
-            InlineKeyboardButton("⚙️ Настройки", callback_data="profile_settings"),
-            InlineKeyboardButton("📊 Статистика", callback_data="profile_stats")
-        ],
-        [
-            InlineKeyboardButton("🔙 Назад", callback_data="back_to_menu")
-        ]
-    ]
-    return InlineKeyboardMarkup(keyboard)
-
-def get_settings_keyboard():
-    """Клавиатура настроек профиля"""
-    keyboard = [
-        [
-            InlineKeyboardButton("🔔 Уведомления", callback_data="toggle_notifications"),
-            InlineKeyboardButton("🌐 Язык", callback_data="change_language")
-        ],
-        [
-            InlineKeyboardButton("🕐 Часовой пояс", callback_data="change_timezone"),
-            InlineKeyboardButton("🗑️ Удалить данные", callback_data="delete_data")
-        ],
-        [
-            InlineKeyboardButton("🔙 Назад в профиль", callback_data="back_to_profile")
-        ]
-    ]
-    return InlineKeyboardMarkup(keyboard)
-
 # Обработчики команд
 async def show_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Показывает профиль пользователя"""
-    user_id = update.effective_user.id
-    profile_manager = UserProfile(user_id)
-    
-    await update.message.reply_text(
-        profile_manager.get_profile_text(),
-        reply_markup=get_profile_keyboard(),
-        parse_mode='Markdown'
+    """Показывает личный кабинет — берёт данные из DB или файла"""
+    user = update.effective_user
+    if not user:
+        return
+
+    telegram_id = str(user.id)
+    user_data = None
+    try:
+        from database import db
+        if hasattr(db, "get_user_by_telegram_id"):
+            user_data = db.get_user_by_telegram_id(int(telegram_id))
+    except Exception:
+        user_data = None
+
+    if not user_data:
+        user_data = _read_user_from_file(telegram_id) or {}
+
+    profile_text = (
+        f"👤 Личный кабинет\n\n"
+        f"📛 Имя: {user_data.get('full_name', 'Не указано')}\n"
+        f"📧 Email: {user_data.get('email', 'Не указан')}\n"
+        f"📱 Телефон: {user_data.get('phone', 'Не указан')}\n"
+        f"⭐ Рейтинг: {user_data.get('rating', 5.0)}/5.0\n"
+        f"🙋 Помогли: {user_data.get('help_offered_count', 0)} раз\n"
+        f"🙏 Получили: {user_data.get('help_received_count', 0)} раз\n\n"
+        f"Вы можете редактировать профиль кнопкой ниже."
     )
+    # Показываем профиль с inline-кнопками для редактирования и главным меню
+    await update.message.reply_text(profile_text, reply_markup=get_profile_keyboard())
+    await update.message.reply_text("Выберите действие:", reply_markup=get_main_menu_keyboard())
 
 async def handle_profile_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обрабатывает нажатия кнопок в профиле"""
+    """Обработка callback'ов профиля: edit_profile, profile_stats"""
     query = update.callback_query
+    if not query or not query.data:
+        return
     await query.answer()
-    
-    user_id = update.effective_user.id
-    profile_manager = UserProfile(user_id)
-    
-    callback_data = query.data
-    
-    if callback_data == "back_to_menu":
-        from menu import get_main_menu_keyboard
-        await query.edit_message_text(
-            "Главное меню:",
-            reply_markup=get_main_menu_keyboard()
+    action = query.data
+
+    if action == "edit_profile":
+        # Начинаем редактирование - спросим новое имя (как пример)
+        await query.message.reply_text("Введите новое имя (Фамилия Имя):")
+        context.user_data['edit_field'] = 'full_name'
+        return EDIT_NAME
+    elif action == "profile_stats":
+        user = update.effective_user
+        telegram_id = str(user.id)
+        # Получаем профиль и показываем статистику
+        user_data = None
+        try:
+            from database import db
+            if hasattr(db, "get_user_by_telegram_id"):
+                user_data = db.get_user_by_telegram_id(int(telegram_id))
+        except Exception:
+            user_data = None
+        if not user_data:
+            user_data = _read_user_from_file(telegram_id) or {}
+
+        stats_text = (
+            f"📊 Статистика профиля\n\n"
+            f"🙋 Помогли: {user_data.get('help_offered_count', 0)} раз\n"
+            f"🙏 Получили: {user_data.get('help_received_count', 0)} раз\n"
+            f"⭐ Рейтинг: {user_data.get('rating', 5.0)}/5.0\n"
         )
+        await query.message.reply_text(stats_text, reply_markup=get_main_menu_keyboard())
         return None
-    
-    elif callback_data == "back_to_profile":
-        await query.edit_message_text(
-            profile_manager.get_profile_text(),
-            reply_markup=get_profile_keyboard(),
-            parse_mode='Markdown'
-        )
+    else:
+        await query.message.reply_text("Неизвестное действие.")
         return None
-    
-    elif callback_data == "profile_settings":
-        await query.edit_message_text(
-            "⚙️ *Настройки профиля*\n\n"
-            "Выберите настройку для изменения:",
-            reply_markup=get_settings_keyboard(),
-            parse_mode='Markdown'
-        )
-        return None
-    
-    elif callback_data == "toggle_notifications":
-        current = profile_manager.profile['settings']['notifications']
-        profile_manager.update_field('notifications', not current)
-        
-        await query.edit_message_text(
-            f"🔔 Уведомления {'включены' if not current else 'выключены'}!",
-            reply_markup=get_settings_keyboard()
-        )
-        return None
-    
-    elif callback_data.startswith("edit_"):
-        field = callback_data.replace("edit_", "")
-        field_names = {
-            'name': 'имя',
-            'age': 'возраст',
-            'email': 'email',
-            'phone': 'телефон'
-        }
-        
-        context.user_data['editing_field'] = field
-        await query.edit_message_text(
-            f"Введите новое {field_names[field]}:"
-        )
-        
-        # Возвращаем соответствующее состояние для ConversationHandler
-        state_mapping = {
-            'name': EDIT_NAME,
-            'age': EDIT_AGE,
-            'email': EDIT_EMAIL,
-            'phone': EDIT_PHONE
-        }
-        return state_mapping.get(field)
 
 async def save_edited_field(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Сохраняет отредактированное поле"""
-    user_id = update.effective_user.id
-    profile_manager = UserProfile(user_id)
-    
-    field = context.user_data.get('editing_field')
-    value = update.message.text
-    
-    if field == 'age':
-        try:
-            value = int(value)
-            if value < 1 or value > 120:
-                await update.message.reply_text("Пожалуйста, введите корректный возраст (1-120):")
-                return EDIT_AGE
-        except ValueError:
-            await update.message.reply_text("Пожалуйста, введите число для возраста:")
-            return EDIT_AGE
-    
-    elif field == 'email' and '@' not in value:
-        await update.message.reply_text("Пожалуйста, введите корректный email:")
-        return EDIT_EMAIL
-    
-    elif field == 'phone' and not value.replace('+', '').replace(' ', '').replace('-', '').isdigit():
-        await update.message.reply_text("Пожалуйста, введите корректный номер телефона:")
-        return EDIT_PHONE
-    
-    profile_manager.update_field(field, value)
-    
-    await update.message.reply_text(
-        f"✅ {field.capitalize()} успешно обновлен!\n\n"
-        f"{profile_manager.get_profile_text()}",
-        reply_markup=get_profile_keyboard(),
-        parse_mode='Markdown'
-    )
-    
-    # Очищаем данные редактирования
-    context.user_data.pop('editing_field', None)
-    
-    # Завершаем редактирование
-    from telegram.ext import ConversationHandler
-    return ConversationHandler.END
+    """Сохраняет редактируемое поле"""
+    text = (update.message.text or "").strip()
+    if not text:
+        await update.message.reply_text("Текст не распознан, попробуйте снова.")
+        return EDIT_NAME  # оставим в том же стейте по умолчанию
+
+    telegram_id = str(update.effective_user.id)
+    # вытянуть редактируемое поле
+    field = context.user_data.get('edit_field', 'full_name')
+
+    # подготовить сохранение
+    try:
+        from database import db
+        if hasattr(db, "create_or_update_user"):
+            # получаем существующие данные для обновления
+            existing = db.get_user_by_telegram_id(int(telegram_id)) or {}
+            existing[field] = text
+            db.create_or_update_user(existing)
+            await update.message.reply_text("✅ Данные обновлены.", reply_markup=get_main_menu_keyboard())
+            context.user_data.pop('edit_field', None)
+            return -1
+    except Exception:
+        # fallback к файлу
+        user_data = _read_user_from_file(telegram_id) or {}
+        user_data[field] = text
+        _save_user_to_file(telegram_id, user_data)
+        await update.message.reply_text("✅ Данные обновлены.", reply_markup=get_main_menu_keyboard())
+        context.user_data.pop('edit_field', None)
+        return -1
 
 async def cancel_edit(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Отменяет редактирование"""
-    await update.message.reply_text(
-        "Редактирование отменено.",
-        reply_markup=get_profile_keyboard()
-    )
-    
-    # Очищаем данные редактирования
-    context.user_data.pop('editing_field', None)
-    
-    from telegram.ext import ConversationHandler
-    return ConversationHandler.END
+    """Отмена редактирования (через /cancel)"""
+    context.user_data.pop('edit_field', None)
+    await update.message.reply_text("Редактирование отменено.", reply_markup=get_main_menu_keyboard())
+    return -1

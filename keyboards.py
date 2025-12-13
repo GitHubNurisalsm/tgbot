@@ -20,18 +20,10 @@ def get_main_menu_keyboard():
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=False)
 
-def get_back_button():
-    """Кнопка "Назад" """
-    return ReplyKeyboardMarkup(
-        [[KeyboardButton("🔙 Назад")]],
-        resize_keyboard=True
-    )
-
 def get_confirmation_keyboard():
     """Подтверждение (Да/Нет)"""
     keyboard = [
         [KeyboardButton("✅ Да"), KeyboardButton("❌ Нет")],
-        [KeyboardButton("🔙 Назад")]
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
 
@@ -40,8 +32,7 @@ def get_categories_keyboard():
     keyboard = [
         [KeyboardButton("💻 IT и программирование"), KeyboardButton("🎨 Дизайн")],
         [KeyboardButton("📝 Тексты и переводы"), KeyboardButton("📊 Маркетинг")],
-        [KeyboardButton("🎓 Обучение"), KeyboardButton("🔧 Разное")],
-        [KeyboardButton("🔙 Назад")]
+        [KeyboardButton("🎓 Обучение"), KeyboardButton("🔧 Разное")]
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
 
@@ -49,7 +40,21 @@ def get_help_keyboard():
     """Клавиатура помощи"""
     keyboard = [
         [KeyboardButton("📖 Инструкция"), KeyboardButton("❓ FAQ")],
-        [KeyboardButton("📞 Связаться"), KeyboardButton("🔙 Назад")]
+        [KeyboardButton("📞 Связаться")]
+    ]
+    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
+
+def get_contact_request_keyboard():
+    """Клавиша для запроса контакта (телефон через Telegram)"""
+    keyboard = [
+        [KeyboardButton("📲 Поделиться контактом", request_contact=True)]
+    ]
+    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
+
+def get_registration_keyboard():
+    """Клавиатура для регистрации (команда 'Начать регистрацию')"""
+    keyboard = [
+        [KeyboardButton("✅ Начать регистрацию")]
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
 
@@ -66,12 +71,11 @@ def get_yes_no_keyboard():
     return InlineKeyboardMarkup(keyboard)
 
 def get_profile_keyboard():
-    """Кнопки для профиля"""
+    """Кнопки для профиля (inline) — без кнопки 'Назад'"""
     keyboard = [
         [
             InlineKeyboardButton("✏️ Редактировать", callback_data="edit_profile"),
             InlineKeyboardButton("📊 Статистика", callback_data="profile_stats")
-        ],
-        [InlineKeyboardButton("🔙 В меню", callback_data="back_menu")]
+        ]
     ]
     return InlineKeyboardMarkup(keyboard)

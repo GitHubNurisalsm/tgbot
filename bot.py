@@ -39,8 +39,8 @@ from telegram.ext import (
 # ===== ИМПОРТЫ ОБРАБОТЧИКОВ =====
 from handlers.start import start_command, help_command, menu_command, cancel_command
 from handlers.registration import (
-    start_registration, register_name, register_phone, register_email,
-    register_password, cancel_registration
+    start_registration, register_name, register_phone, register_confirm_phone,
+    register_verify_phone_code, register_email, register_password, cancel_registration
 )
 from handlers.login import (
     start_login, process_login_input, process_password_input, cancel_login
@@ -56,16 +56,96 @@ from personal import show_profile, handle_profile_callback, save_edited_field, c
 from states import EDIT_NAME, EDIT_AGE, EDIT_EMAIL, EDIT_PHONE
 
 # Импортируем функционал "Попросить помощи" и дополнительные сущности
-from need_help import (
-    show_need_help_menu, start_create_request, process_request_category, process_request_description,
-    process_request_budget, process_request_deadline, process_request_contacts, cancel_request_flow,
-    REQUEST_CATEGORY, REQUEST_DESCRIPTION, REQUEST_BUDGET, REQUEST_DEADLINE, REQUEST_CONTACTS,
-    handle_request_callback, request_system, get_request_keyboard,
-    search_requests, show_requests_in_category
-)
+# #region agent log
+import json
+try:
+    with open('/Users/macbook/Documents/Inai/tgbot/.cursor/debug.log', 'a', encoding='utf-8') as f:
+        f.write(json.dumps({"id":"log_import_start","timestamp":int(__import__('time').time()*1000),"location":"bot.py:59","message":"Starting need_help import","data":{"requested_functions":["show_need_help_menu","start_create_request","process_request_category","process_request_description","process_request_budget","process_request_deadline","process_request_contacts","cancel_request_flow","REQUEST_CATEGORY","REQUEST_DESCRIPTION","REQUEST_BUDGET","REQUEST_DEADLINE","REQUEST_CONTACTS","handle_request_callback","request_system","get_request_keyboard","search_requests","show_requests_in_category"]},"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}) + '\n')
+except: pass
+# #endregion
+try:
+    import need_help
+    # #region agent log
+    try:
+        with open('/Users/macbook/Documents/Inai/tgbot/.cursor/debug.log', 'a', encoding='utf-8') as f:
+            f.write(json.dumps({"id":"log_need_help_loaded","timestamp":int(__import__('time').time()*1000),"location":"bot.py:59","message":"need_help module loaded successfully","data":{"available_attrs":list(dir(need_help))},"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}) + '\n')
+    except: pass
+    # #endregion
+    # #region agent log
+    try:
+        with open('/Users/macbook/Documents/Inai/tgbot/.cursor/debug.log', 'a', encoding='utf-8') as f:
+            has_handle = hasattr(need_help, 'handle_request_callback')
+            has_show = hasattr(need_help, 'show_requests_in_category')
+            f.write(json.dumps({"id":"log_check_functions","timestamp":int(__import__('time').time()*1000),"location":"bot.py:59","message":"Checking if functions exist in need_help","data":{"has_handle_request_callback":has_handle,"has_show_requests_in_category":has_show},"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}) + '\n')
+    except: pass
+    # #endregion
+    from need_help import (
+        show_need_help_menu, start_create_request, process_request_category, process_request_description,
+        process_request_budget, process_request_deadline, process_request_contacts, cancel_request_flow,
+        REQUEST_CATEGORY, REQUEST_DESCRIPTION, REQUEST_BUDGET, REQUEST_DEADLINE, REQUEST_CONTACTS,
+        request_system, get_request_keyboard,
+        search_requests
+    )
+    # #region agent log
+    try:
+        with open('/Users/macbook/Documents/Inai/tgbot/.cursor/debug.log', 'a', encoding='utf-8') as f:
+            f.write(json.dumps({"id":"log_partial_import_success","timestamp":int(__import__('time').time()*1000),"location":"bot.py:59","message":"Partial import from need_help succeeded","data":{"imported":["show_need_help_menu","start_create_request","process_request_category","process_request_description","process_request_budget","process_request_deadline","process_request_contacts","cancel_request_flow","REQUEST_CATEGORY","REQUEST_DESCRIPTION","REQUEST_BUDGET","REQUEST_DEADLINE","REQUEST_CONTACTS","request_system","get_request_keyboard","search_requests"]},"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}) + '\n')
+    except: pass
+    # #endregion
+    # Try to import handle_request_callback from requests instead
+    # #region agent log
+    try:
+        with open('/Users/macbook/Documents/Inai/tgbot/.cursor/debug.log', 'a', encoding='utf-8') as f:
+            f.write(json.dumps({"id":"log_trying_requests_import","timestamp":int(__import__('time').time()*1000),"location":"bot.py:59","message":"Attempting to import handle_request_callback from requests","data":{},"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}) + '\n')
+    except: pass
+    # #endregion
+    try:
+        import requests as requests_module
+        # #region agent log
+        try:
+            with open('/Users/macbook/Documents/Inai/tgbot/.cursor/debug.log', 'a', encoding='utf-8') as f:
+                has_handle_in_requests = hasattr(requests_module, 'handle_request_callback')
+                f.write(json.dumps({"id":"log_check_requests_module","timestamp":int(__import__('time').time()*1000),"location":"bot.py:59","message":"Checking requests module for handle_request_callback","data":{"has_handle_request_callback":has_handle_in_requests,"available_attrs":list(dir(requests_module))[:20]},"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}) + '\n')
+        except: pass
+        # #endregion
+        if hasattr(requests_module, 'handle_request_callback'):
+            handle_request_callback = requests_module.handle_request_callback
+            # #region agent log
+            try:
+                with open('/Users/macbook/Documents/Inai/tgbot/.cursor/debug.log', 'a', encoding='utf-8') as f:
+                    f.write(json.dumps({"id":"log_import_success_requests","timestamp":int(__import__('time').time()*1000),"location":"bot.py:59","message":"Successfully imported handle_request_callback from requests","data":{},"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}) + '\n')
+            except: pass
+            # #endregion
+        else:
+            # #region agent log
+            try:
+                with open('/Users/macbook/Documents/Inai/tgbot/.cursor/debug.log', 'a', encoding='utf-8') as f:
+                    f.write(json.dumps({"id":"log_handle_not_found","timestamp":int(__import__('time').time()*1000),"location":"bot.py:59","message":"handle_request_callback not found in requests module","data":{},"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}) + '\n')
+            except: pass
+            # #endregion
+            handle_request_callback = None
+    except Exception as e:
+        # #region agent log
+        try:
+            with open('/Users/macbook/Documents/Inai/tgbot/.cursor/debug.log', 'a', encoding='utf-8') as f:
+                f.write(json.dumps({"id":"log_requests_import_error","timestamp":int(__import__('time').time()*1000),"location":"bot.py:59","message":"Error importing from requests","data":{"error":str(e)},"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}) + '\n')
+        except: pass
+        # #endregion
+        handle_request_callback = None
+    # show_requests_in_category is not used, so we skip it
+    show_requests_in_category = None
+except ImportError as e:
+    # #region agent log
+    try:
+        with open('/Users/macbook/Documents/Inai/tgbot/.cursor/debug.log', 'a', encoding='utf-8') as f:
+            f.write(json.dumps({"id":"log_import_error","timestamp":int(__import__('time').time()*1000),"location":"bot.py:59","message":"ImportError from need_help","data":{"error":str(e),"error_type":type(e).__name__},"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}) + '\n')
+    except: pass
+    # #endregion
+    raise
 
 from states import (
-    REGISTER_NAME, REGISTER_PHONE, REGISTER_EMAIL, REGISTER_PASSWORD,
+    REGISTER_NAME, REGISTER_PHONE, REGISTER_CONFIRM_PHONE, REGISTER_VERIFY_PHONE_CODE,
+    REGISTER_EMAIL, REGISTER_PASSWORD,
     LOGIN_EMAIL, LOGIN_PASSWORD,
     OFFER_CATEGORY, OFFER_TITLE, OFFER_DESCRIPTION, OFFER_CONTACTS
 )
@@ -82,59 +162,22 @@ async def error_handler(update, context):
 # ===== ОБРАБОТЧИКИ ГЛАВНОГО МЕНЮ =====
 
 async def handle_offer_help(update, context):
-    """🙋‍♂️ Предложить помощь — показывает список активных заявок для отклика"""
-    user = update.effective_user
-    if not user:
-        return await update.message.reply_text("❌ Ошибка пользователя")
-    
-    # Получаем последние активные заявки, чтобы волонтер мог откликнуться
-    requests = request_system.get_all_active_requests(limit=10)
-    
-    if not requests:
-        await update.message.reply_text(
-            "📭 Пока нет активных заявок для помощи. Попробуйте позже или создайте своё предложение помощи.",
-            reply_markup=get_main_menu_keyboard()
-        )
-        return
-    
-    await update.message.reply_text(
-        f"🆘 Найдено {len(requests)} активных заявок. Выберите, на какую хотите откликнуться:",
-        reply_markup=get_main_menu_keyboard()
-    )
-    
-    for req in requests:
-        created = req.get('created_at', '')
-        try:
-            created_str = datetime.fromisoformat(created).strftime('%d.%m.%Y %H:%M') if created else ''
-        except Exception:
-            created_str = created
-        
-        text = (
-            f"🆔 *Запрос #{req['id']}*\n"
-            f"👤 Автор: {req.get('username', '—')}\n"
-            f"🎯 Категория: {req.get('category', '—')}\n"
-            f"💰 Бюджет: {req.get('budget', 'Не указан')}\n"
-            f"⏰ Срок: {req.get('deadline', 'Не указан')}\n\n"
-            f"{(req.get('description') or '')[:400]}{('...' if len(req.get('description',''))>400 else '')}\n\n"
-            f"📅 Создан: {created_str}"
-        )
-        
-        # Кнопки: Откликнуться / Написать автору (get_request_keyboard создаёт кнопки для отклика)
-        await update.message.reply_text(
-            text,
-            parse_mode='Markdown',
-            reply_markup=get_request_keyboard(req['id'], is_owner=(user.id == req.get('user_id')))
-        )
+    """🙋‍♂️ Предложить помощь — запускает процесс создания предложения помощи"""
+    logger.info(f"handle_offer_help вызван для пользователя {update.effective_user.id if update.effective_user else 'unknown'}")
+    # Запускаем процесс создания предложения помощи
+    return await start_offer_help(update, context)
 
 
 async def handle_need_help(update, context):
     """🙏 Попросить помощи — показывает меню или запускает создание запроса"""
+    logger.info(f"handle_need_help вызван для пользователя {update.effective_user.id if update.effective_user else 'unknown'}")
     await show_need_help_menu(update, context)
     logger.info(f"Пользователь {update.effective_user.id} открыл меню 'Нужна помощь'")
 
 
 async def handle_profile(update, context):
     """👤 Личный кабинет"""
+    logger.info(f"handle_profile вызван для пользователя {update.effective_user.id if update.effective_user else 'unknown'}")
     user_id = update.effective_user.id
     from database import db
     
@@ -149,7 +192,7 @@ async def handle_profile(update, context):
         return
     
     profile_text = (
-        f"👤 *Личный кабинет*\n\n"
+        f"👤 Личный кабинет\n\n"
         f"📛 Имя: {user_data.get('full_name', 'Не указано')}\n"
         f"📧 Email: {user_data.get('email', 'Не указан')}\n"
         f"📱 Телефон: {user_data.get('phone', 'Не указан')}\n"
@@ -161,7 +204,6 @@ async def handle_profile(update, context):
     
     await update.message.reply_text(
         profile_text,
-        parse_mode='Markdown',
         reply_markup=get_main_menu_keyboard()
     )
     logger.info(f"Пользователь {user_id} открыл профиль")
@@ -169,6 +211,7 @@ async def handle_profile(update, context):
 
 async def handle_rating(update, context):
     """⭐ Общий рейтинг волонтёров (топ и статистика)"""
+    logger.info(f"handle_rating вызван для пользователя {update.effective_user.id if update.effective_user else 'unknown'}")
     try:
         top_users = rating_system.get_top_users(limit=10)
         # Подсчёт средней оценки по всем пользователям (если есть данные)
@@ -207,6 +250,7 @@ async def handle_rating(update, context):
 
 async def handle_requests(update, context):
     """📋 Показать последние активные заявки"""
+    logger.info(f"handle_requests вызван для пользователя {update.effective_user.id if update.effective_user else 'unknown'}")
     user = update.effective_user
     if not user:
         return await update.message.reply_text("❌ Ошибка пользователя")
@@ -234,7 +278,7 @@ async def handle_requests(update, context):
             created_str = created
 
         text = (
-            f"🆔 *Запрос #{req['id']}*\n"
+            f"🆔 Запрос #{req['id']}\n"
             f"👤 Автор: {req.get('username', '—')}\n"
             f"🎯 Категория: {req.get('category', '—')}\n"
             f"💰 Бюджет: {req.get('budget', 'Не указан')}\n"
@@ -245,14 +289,19 @@ async def handle_requests(update, context):
 
         await update.message.reply_text(
             text,
-            parse_mode='Markdown',
             reply_markup=get_request_keyboard(req['id'], is_owner=(user.id == req.get('user_id')))
         )
 
 
 async def main_menu_handler(update, context):
     """Основной обработчик меню - распределяет нажатия кнопок"""
+    if not update.message:
+        return
+    
     text = update.message.text
+    user_id = update.effective_user.id if update.effective_user else None
+    
+    logger.info(f"Обработка сообщения от пользователя {user_id}: '{text}'")
     
     if text == "🙋‍♂️ Предложить помощь":
         await handle_offer_help(update, context)
@@ -268,6 +317,7 @@ async def main_menu_handler(update, context):
         await contact_support_command(update, context)
     else:
         # Если ничего не совпадает, показываем справку
+        logger.debug(f"Неизвестная команда: '{text}', показываем справку")
         await help_command(update, context)
 
 
@@ -286,9 +336,9 @@ def register_handlers(app):
     app.add_handler(CommandHandler("cancel", cancel_command))
     
     # ===== ПРОФИЛЬ (Conversation + Callback) =====
+    # Используем handle_profile вместо show_profile для entry point, чтобы показывать главное меню
     profile_conv = ConversationHandler(
         entry_points=[
-            MessageHandler(filters.Regex("^👤 Личный кабинет$"), show_profile),
             CallbackQueryHandler(handle_profile_callback, pattern="^(edit_|profile_settings|back_to_profile|back_to_menu|toggle_notifications)")
         ],
         states={
@@ -315,7 +365,12 @@ def register_handlers(app):
         ],
         states={
             REGISTER_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, register_name)],
-            REGISTER_PHONE: [MessageHandler(filters.TEXT & ~filters.COMMAND, register_phone)],
+            REGISTER_PHONE: [
+                MessageHandler(filters.CONTACT, register_phone),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, register_phone)
+            ],
+            REGISTER_CONFIRM_PHONE: [MessageHandler(filters.TEXT & ~filters.COMMAND, register_confirm_phone)],
+            REGISTER_VERIFY_PHONE_CODE: [MessageHandler(filters.TEXT & ~filters.COMMAND, register_verify_phone_code)],
             REGISTER_EMAIL: [MessageHandler(filters.TEXT & ~filters.COMMAND, register_email)],
             REGISTER_PASSWORD: [MessageHandler(filters.TEXT & ~filters.COMMAND, register_password)],
         },
@@ -376,11 +431,42 @@ def register_handlers(app):
     )
     app.add_handler(need_help_conv)
     logger.info("  ✅ 'Попросить помощи' зарегистрирована")
+    
+    # ===== ПРЕДЛОЖИТЬ ПОМОЩЬ =====
+    offer_help_conv = ConversationHandler(
+        entry_points=[
+            MessageHandler(filters.Regex("^🙋‍♂️ Предложить помощь$"), start_offer_help),
+        ],
+        states={
+            OFFER_CATEGORY: [MessageHandler(filters.TEXT & ~filters.COMMAND, process_offer_category)],
+            OFFER_TITLE: [MessageHandler(filters.TEXT & ~filters.COMMAND, process_offer_title)],
+            OFFER_DESCRIPTION: [MessageHandler(filters.TEXT & ~filters.COMMAND, process_offer_description)],
+            OFFER_CONTACTS: [MessageHandler(filters.TEXT & ~filters.COMMAND, process_offer_contacts)],
+        },
+        fallbacks=[
+            CommandHandler('cancel', cancel_offer),
+            MessageHandler(filters.Regex("^🔙 Назад$|^🔙 Отмена$|^🔙 Назад в меню$"), cancel_offer)
+        ]
+    )
+    app.add_handler(offer_help_conv)
+    logger.info("  ✅ 'Предложить помощь' зарегистрирована")
 
     # ===== ГЛАВНОЕ МЕНЮ (ДОЛЖНО БЫТЬ ПОСЛЕДНИМ!) =====
+    # Сначала регистрируем специфичные обработчики для каждой кнопки главного меню
+    # Это гарантирует, что они будут обработаны до общего обработчика
+    # Примечание: "🙋‍♂️ Предложить помощь" обрабатывается ConversationHandler выше
+    app.add_handler(MessageHandler(filters.Regex("^🙏 Попросить помощи$"), handle_need_help))
+    app.add_handler(MessageHandler(filters.Regex("^👤 Личный кабинет$"), handle_profile))
+    app.add_handler(MessageHandler(filters.Regex("^⭐ Рейтинг$"), handle_rating))
+    app.add_handler(MessageHandler(filters.Regex("^📋 Активные заявки$"), handle_requests))
+    app.add_handler(MessageHandler(filters.Regex("^📞 Поддержка$"), contact_support_command))
+    logger.info("  ✅ Обработчики кнопок главного меню зарегистрированы")
+    
     # Глобальная "Назад" -> возвращаем в главное меню (если не в ConversationHandler)
     app.add_handler(MessageHandler(filters.Regex(r"^(🔙 Назад|🔙 Назад в меню|Назад)$"), menu_command))
     logger.info("  ✅ 'Назад' глобальный handler зарегистрирован")
+    
+    # Общий обработчик для остальных текстовых сообщений (должен быть последним)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, main_menu_handler))
     
     logger.info("  ✅ Главное меню зарегистрировано")

@@ -2,8 +2,19 @@
 import sqlite3
 import logging
 import os
+import json
+from typing import Optional, Dict, Any
 
 logger = logging.getLogger(__name__)
+
+DB_PATH = os.getenv("DATABASE_PATH", "data/bot_database.db")
+USER_JSON_PATH = os.path.join("data", "users.json")
+USER_FILES_TO_CLEAR = [
+    USER_JSON_PATH,
+    os.path.join("data", "user_ratings.json"),
+    os.path.join("data", "user_reviews.json"),
+    os.path.join("data", "user_stats.json"),
+]
 
 
 class Database:
@@ -92,12 +103,40 @@ class Database:
             return None
     
     def get_user_by_telegram_id(self, telegram_id: int):
-        """Получить пользователя по Telegram ID"""
-        with self.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute('SELECT * FROM users WHERE telegram_id = ?', (telegram_id,))
-            row = cursor.fetchone()
-            return dict(row) if row else None
+        """Получить пользователя по Telegram ID - проверяет и БД, и users.json"""
+        telegram_id_str = str(telegram_id)
+        logger.info(f"Поиск пользователя с telegram_id: {telegram_id_str}")
+        
+        # Сначала проверяем users.json
+        try:
+            if os.path.exists(USER_JSON_PATH):
+                with open(USER_JSON_PATH, 'r', encoding='utf-8') as f:
+                    txt = f.read().strip()
+                    if txt:
+                        users_data = json.loads(txt)
+                        user_data = users_data.get(telegram_id_str)
+                        if user_data:
+                            logger.info(f"✅ Пользователь {telegram_id_str} найден в users.json")
+                            return user_data
+                        else:
+                            logger.debug(f"Пользователь {telegram_id_str} не найден в users.json. Доступные ключи: {list(users_data.keys())}")
+        except Exception as e:
+            logger.error(f"Ошибка чтения users.json: {e}", exc_info=True)
+        
+        # Если не найдено в файле, проверяем БД
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute('SELECT * FROM users WHERE telegram_id = ?', (telegram_id,))
+                row = cursor.fetchone()
+                if row:
+                    logger.info(f"✅ Пользователь {telegram_id_str} найден в БД")
+                    return dict(row)
+        except Exception as e:
+            logger.error(f"Ошибка проверки БД: {e}", exc_info=True)
+        
+        logger.warning(f"❌ Пользователь {telegram_id_str} не найден ни в users.json, ни в БД")
+        return None
     
     def get_user_by_email(self, email: str):
         """Получить пользователя по email"""
@@ -152,6 +191,81 @@ class Database:
             stats['completed_requests'] = cursor.fetchone()['count']
             
             return stats
+
+    def _sqlite_conn(self):
+        try:
+            return sqlite3.connect(self.db_name)
+        except Exception as e:
+            logger.debug("SQLite not available: %s", e)
+            return None
+
+    def create_or_update_user(self, user_data: Dict[str, Any]) -> bool:
+        telegram_id = str(user_data.get('telegram_id') or user_data.get('user_id') or user_data.get('id'))
+        if not telegram_id:
+            logger.error("create_or_update_user: telegram_id not provided")
+            return False
+
+        # Try SQLite upsert
+        conn = self._sqlite_conn()
+        if conn:
+            try:
+                cur = conn.cursor()
+                # ensure table exists; keep simple schema with telegram_id and data(JSON)
+                cur.execute("""CREATE TABLE IF NOT EXISTS users (
+                                telegram_id TEXT PRIMARY KEY,
+                                data TEXT
+                              )""")
+                cur.execute("INSERT OR REPLACE INTO users (telegram_id, data) VALUES (?, ?)",
+                            (telegram_id, json.dumps(user_data, ensure_ascii=False)))
+                conn.commit()
+                return True
+            except Exception as e:
+                logger.debug("SQLite write failed: %s", e)
+            finally:
+                conn.close()
+
+        # Fallback to file
+        os.makedirs(os.path.dirname(USER_JSON_PATH), exist_ok=True)
+        try:
+            existing = {}
+            if os.path.exists(USER_JSON_PATH):
+                with open(USER_JSON_PATH, 'r', encoding='utf-8') as f:
+                    t = f.read().strip()
+                    existing = json.loads(t) if t else {}
+            existing[telegram_id] = user_data
+            with open(USER_JSON_PATH, 'w', encoding='utf-8') as f:
+                json.dump(existing, f, ensure_ascii=False, indent=2)
+            return True
+        except Exception as e:
+            logger.error("Failed to save user to file: %s", e)
+            return False
+
+    def clear_all_users(self):
+        """Удаляет всех пользователей из БД / файлов — заставляет всех зарегистрированных пройти регистрацию заново"""
+        # Clear SQLite users table
+        conn = self._sqlite_conn()
+        if conn:
+            try:
+                cur = conn.cursor()
+                # if table exists, clear it
+                cur.execute("DROP TABLE IF EXISTS users")
+                conn.commit()
+                logger.info("Cleared SQLite users table")
+            except Exception as e:
+                logger.warning("Failed to clear SQLite users table: %s", e)
+            finally:
+                conn.close()
+
+        # Clear several JSON files used to store user data or stats
+        for p in USER_FILES_TO_CLEAR:
+            try:
+                if os.path.exists(p):
+                    # For json files, rewrite as empty object {}
+                    with open(p, 'w', encoding='utf-8') as f:
+                        json.dump({}, f, ensure_ascii=False, indent=2)
+                    logger.info("Cleared file: %s", p)
+            except Exception as e:
+                logger.warning("Failed to clear file %s: %s", p, e)
 
 
 # Глобальный экземпляр

@@ -388,7 +388,7 @@ async def process_message_target(update: Update, context: ContextTypes.DEFAULT_T
         context.user_data['message_target'] = {'type': 'request', 'id': request_id}
         
         # Проверяем существование запроса
-        request = request_system.get_request_by_id(request_id)
+        request = need_help_system.get_request_by_id(request_id)
         if not request:
             await update.message.reply_text(
                 f"❌ Запрос #{request_id} не найден.\n"
@@ -451,7 +451,7 @@ async def send_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         # Здесь должна быть логика определения получателя
         # Для примера: получатель - автор запроса
-        request = request_system.get_request_by_id(request_id)
+        request = need_help_system.get_request_by_id(request_id)
         if request:
             receiver_id = request['user_id']
             receiver_name = request['username']
@@ -542,7 +542,7 @@ async def save_review(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     # Получаем информацию о запросе
-    request = request_system.get_request_by_id(request_id)
+    request = need_help_system.get_request_by_id(request_id)
     if not request:
         await update.message.reply_text(
             f"❌ Запрос #{request_id} не найден.",

@@ -13,39 +13,33 @@ def get_main_menu_keyboard():
 def get_registration_keyboard():
     """Клавиатура для регистрации"""
     keyboard = [
-        [KeyboardButton("✅ Начать регистрацию")],
-        [KeyboardButton("🔙 Назад в меню")]
+        [KeyboardButton("✅ Начать регистрацию")]
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
 
 def get_back_to_menu_keyboard():
-    """Простая кнопка возврата в меню"""
-    keyboard = [
-        [KeyboardButton("🔙 Назад")]
-    ]
+    """Простая кнопка возврата в меню убрана (функцию оставляю, но без кнопки)"""
+    keyboard = []
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
 
 def get_confirmation_keyboard():
     """Клавиатура подтверждения"""
     keyboard = [
-        [KeyboardButton("✅ Да"), KeyboardButton("❌ Нет")],
-        [KeyboardButton("🔙 Назад в меню")]
+        [KeyboardButton("✅ Да"), KeyboardButton("❌ Нет")]
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
 
 def get_profile_keyboard():
-    """Клавиатура профиля"""
+    """Клавиатура профиля - убрал кнопку 'Назад в меню'"""
     keyboard = [
-        [KeyboardButton("✏️ Редактировать профиль"), KeyboardButton("📊 Статистика")],
-        [KeyboardButton("🔙 Назад в меню")]
+        [KeyboardButton("✏️ Редактировать профиль"), KeyboardButton("📊 Статистика")]
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
 
 def get_settings_keyboard():
-    """Клавиатура настроек"""
+    """Клавиатура настроек - убрал кнопку 'Назад в меню'"""
     keyboard = [
-        [KeyboardButton("🔔 Уведомления"), KeyboardButton("🌐 Язык")],
-        [KeyboardButton("🔙 Назад в меню")]
+        [KeyboardButton("🔔 Уведомления"), KeyboardButton("🌐 Язык")]
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
 
@@ -53,22 +47,15 @@ def get_help_keyboard():
     """Клавиатура помощи"""
     keyboard = [
         [KeyboardButton("📖 Инструкция"), KeyboardButton("❓ FAQ")],
-        [KeyboardButton("📞 Связаться"), KeyboardButton("🔙 Назад в меню")]
-    ]
-    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
-
-def get_contact_keyboard():
-    """Клавиатура с контактами"""
-    keyboard = [
-        [KeyboardButton("📧 Email"), KeyboardButton("📱 Телефон")],
-        [KeyboardButton("🌐 Веб-сайт"), KeyboardButton("🔙 Назад в меню")]
+        [KeyboardButton("📞 Связаться")]
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
 
 # Функции для проверки, какая кнопка была нажата
 def is_back_to_menu(text: str) -> bool:
-    """Проверяет, нажата ли кнопка возврата в меню"""
-    return text in ["🔙 Назад", "🔙 Назад в меню", "Назад", "Вернуться в меню", "Меню"]
+    """Проверяет, была ли команда возврата в меню"""
+    # Без текстовой кнопки "🔙 Назад" — поддерживаем только другие варианты (например, команды)
+    return text in ["Меню", "Вернуться в меню", "/menu"]
 
 def is_registration(text: str) -> bool:
     """Проверяет, нажата ли кнопка регистрации"""
@@ -93,3 +80,18 @@ def is_profile(text: str) -> bool:
 def is_settings(text: str) -> bool:
     """Проверяет, нажата ли кнопка настроек"""
     return text in ["⚙️ Настройки", "Настройки"]
+
+def is_offer(text: str) -> bool:
+    """Проверяет, нажата ли кнопка 'Предложить помощь'"""
+    t = (text or "").lower()
+    return "предлож" in t and "помощ" in t
+
+def is_need_help(text: str) -> bool:
+    """Проверяет, нажата ли кнопка 'Попросить помощи' / 'Создать запрос'"""
+    t = (text or "").lower()
+    return "попрос" in t or "создать запрос" in t or "искат" in t or "запрос" in t
+
+def is_requests(text: str) -> bool:
+    """Проверяет, нажата ли кнопка 'Активные заявки'"""
+    t = (text or "").lower()
+    return "актив" in t or "заяв" in t

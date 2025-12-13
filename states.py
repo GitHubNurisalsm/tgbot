@@ -3,23 +3,23 @@
 
 # ========== РЕГИСТРАЦИЯ ==========
 # Шаги регистрации нового пользователя
-REGISTER_NAME, REGISTER_PHONE, REGISTER_EMAIL, REGISTER_PASSWORD = range(4)
+REGISTER_NAME, REGISTER_PHONE, REGISTER_CONFIRM_PHONE, REGISTER_VERIFY_PHONE_CODE, REGISTER_EMAIL, REGISTER_CONFIRM_EMAIL, REGISTER_PASSWORD = range(10, 17)
 
 # ========== ВХОД В СИСТЕМУ ==========
 # Шаги процесса входа
-LOGIN_EMAIL, LOGIN_PASSWORD = range(2, 4)
+LOGIN_EMAIL, LOGIN_PASSWORD = range(20, 22)
 
 # ========== ПРЕДЛОЖИТЬ ПОМОЩЬ ==========
 # Шаги создания предложения помощи
-OFFER_CATEGORY, OFFER_TITLE, OFFER_DESCRIPTION, OFFER_CONTACTS = range(4, 8)
+OFFER_CATEGORY, OFFER_TITLE, OFFER_DESCRIPTION, OFFER_CONTACTS = range(40, 44)
 
 # ========== ПОПРОСИТЬ ПОМОЩИ ==========
 # Шаги создания заявки "Попросить помощи"
-NEED_CATEGORY, NEED_TITLE, NEED_DESCRIPTION, NEED_LOCATION, NEED_URGENT, NEED_CONTACTS = range(9, 15)
+REQUEST_CATEGORY, REQUEST_DESCRIPTION, REQUEST_BUDGET, REQUEST_DEADLINE, REQUEST_CONTACTS = range(50, 55)
 
 # ========== РЕДАКТИРОВАНИЕ ПРОФИЛЯ ==========
 # Шаги редактирования профиля пользователя
-EDIT_CHOOSE_FIELD, EDIT_NAME, EDIT_AGE, EDIT_PHONE, EDIT_EMAIL, EDIT_PASSWORD, EDIT_LOCATION = range(15, 22)
+EDIT_NAME, EDIT_AGE, EDIT_EMAIL, EDIT_PHONE = range(30, 34)
 
 # ========== СОЗДАНИЕ ОТКЛИКА ==========
 # Шаги создания отклика на заявку
@@ -53,7 +53,10 @@ STATE_DESCRIPTIONS = {
     # Регистрация
     REGISTER_NAME: "Ввод ФИО при регистрации",
     REGISTER_PHONE: "Ввод телефона при регистрации",
+    REGISTER_CONFIRM_PHONE: "Подтверждение телефона",
+    REGISTER_VERIFY_PHONE_CODE: "Ввод SMS кода подтверждения",
     REGISTER_EMAIL: "Ввод email при регистрации",
+    REGISTER_CONFIRM_EMAIL: "Подтверждение email",
     REGISTER_PASSWORD: "Ввод пароля при регистрации",
     
     # Вход
@@ -67,21 +70,17 @@ STATE_DESCRIPTIONS = {
     OFFER_CONTACTS: "Выбор контактов для связи",
     
     # Попросить помощи
-    NEED_CATEGORY: "Выбор категории при запросе помощи",
-    NEED_TITLE: "Ввод заголовка запроса",
-    NEED_DESCRIPTION: "Ввод описания запроса",
-    NEED_LOCATION: "Ввод местоположения",
-    NEED_URGENT: "Выбор срочности запроса",
-    NEED_CONTACTS: "Выбор контактов для связи",
+    REQUEST_CATEGORY: "Выбор категории при запросе помощи",
+    REQUEST_DESCRIPTION: "Ввод описания запроса",
+    REQUEST_BUDGET: "Ввод бюджета запроса",
+    REQUEST_DEADLINE: "Ввод срока выполнения запроса",
+    REQUEST_CONTACTS: "Выбор контактов для связи",
     
     # Редактирование профиля
-    EDIT_CHOOSE_FIELD: "Выбор поля для редактирования",
     EDIT_NAME: "Редактирование ФИО",
     EDIT_AGE: "Редактирование возраста",
-    EDIT_PHONE: "Редактирование телефона",
     EDIT_EMAIL: "Редактирование email",
-    EDIT_PASSWORD: "Редактирование пароля",
-    EDIT_LOCATION: "Редактирование местоположения",
+    EDIT_PHONE: "Редактирование телефона",
     
     # Отклик на заявку
     RESPONSE_CHOOSE_REQUEST: "Выбор заявки для отклика",
@@ -155,19 +154,22 @@ def print_all_states():
 REGISTRATION_STATES = {
     REGISTER_NAME,
     REGISTER_PHONE,
+    REGISTER_CONFIRM_PHONE,
+    REGISTER_VERIFY_PHONE_CODE,
     REGISTER_EMAIL,
+    REGISTER_CONFIRM_EMAIL,
     REGISTER_PASSWORD
 }
 
 # Все состояния создания заявок
 REQUEST_CREATION_STATES = {
     OFFER_CATEGORY, OFFER_TITLE, OFFER_DESCRIPTION, OFFER_CONTACTS,
-    NEED_CATEGORY, NEED_TITLE, NEED_DESCRIPTION, NEED_LOCATION, NEED_URGENT, NEED_CONTACTS
+    REQUEST_CATEGORY, REQUEST_DESCRIPTION, REQUEST_BUDGET, REQUEST_DEADLINE, REQUEST_CONTACTS
 }
 
 # Все состояния редактирования профиля
 PROFILE_EDIT_STATES = {
-    EDIT_CHOOSE_FIELD, EDIT_NAME, EDIT_PHONE, EDIT_EMAIL, EDIT_PASSWORD, EDIT_LOCATION
+    EDIT_NAME, EDIT_PHONE, EDIT_EMAIL
 }
 
 # Все состояния связанные с заявками
